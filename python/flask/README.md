@@ -13,23 +13,21 @@ make run
 
 ```sh
 # Azure にログイン
+# ※ az コマンドがない場合、 brew install azure-cli でインストール
 az login
-※ az コマンドがない場合、 brew install azure-cli でインストール
 
 ##### Azure App Service にデプロイ #####
 
 # B1: ¥8,266.703/month
+# ※ sku: Stock Keeping Unit
 az webapp up --runtime PYTHON:3.12 --sku B1 --logs
-※ sku: Stock Keeping Unit
 
 # F1: ¥0
 az webapp up --runtime PYTHON:3.12 --sku F1 --logs
 
 # F1 + 各種指定(アプリ名, リソースグループ名, リージョン)
-※ AppServicePlan は事前に作成していない想定
-az webapp up --name {アプリ名} --resource-group {リソースグループ名} --runtime PYTHON:3.12 --sku F1 --location japaneast --logs
-## 例
-az webapp up --name flaskdemo20250410 --resource-group rg-flaskdemo-dev-jpn-01 --runtime PYTHON:3.12 --sku F1 --location japaneast --logs
+# ※ AppServicePlan は事前に作成していない想定
+az webapp up --name $WEBAPP --resource-group $RESOURCE_GROUP --runtime PYTHON:3.12 --sku F1 --location japaneast --logs
 
 
 ※ アプリ名はグローバルでユニークである必要がある
@@ -47,34 +45,23 @@ az webapp up --name flaskdemo20250410 --resource-group rg-flaskdemo-dev-jpn-01 -
     ※ デフォルトでは無料の F1 プランが設定される
 
 # リソースのクリーンアップ
-az group delete --name {リソースグループ名} --no-wait
-## 例
-az group delete --name rg-flaskdemo-dev-jpn-01 --no-wait
+az group delete --name $RESOURCE_GROUP --no-wait
 
 ##### App Service Plan の作成 #####
 # リソースグループの作成
-※ App Service Plan の作成にはリソースグループが必要
-az group create --name {resource-group-name} --location {region}
-## 例
-az group create --name rg-flaskdemo-dev-jpn-01 --location japaneast
+# ※ App Service Plan の作成にはリソースグループが必要
+az group create --name $RESOURCE_GROUP --location $LOCATION
 
 # App Service Plan の作成
-az appservice plan create --name {app-service-plan-name} --resource-group {resource-group-name} --sku {sku} --is-linux
-## 例
-az appservice plan create --name asp-flaskdemo-dev-jpn-01 --resource-group rg-flaskdemo-dev-jpn-01 --sku F1 --is-linux
+az appservice plan create --name $APP_SERVICE_PLAN --resource-group $RESOURCE_GROUP --sku F1 --is-linux
 
 
 # 作成した App Service Plan の確認
-az appservice plan list --resource-group {resource-group-name} --output table
-## 例
-az appservice plan list --resource-group rg-flaskdemo-dev-jpn-01 --output table
+az appservice plan list --resource-group $RESOURCE_GROUP --output table
 
 
 # webapp の作成
-az webapp up --name {アプリ名} --resource-group {リソースグループ名} --plan {AppServicePlan名} --runtime PYTHON:3.12 --sku F1 --location japaneast --logs
-## 例
-az webapp up --name flaskdemo20250410 --resource-group rg-flaskdemo-dev-jpn-01 --plan  --runtime PYTHON:3.12 --sku F1 --location japaneast --logs
-
+az webapp up --name $WEBAPP_PLAN --resource-group $RESOURCE_GROUP --plan  --runtime PYTHON:3.12 --sku F1 --location $LOCATION --logs
 
 
 ##### その他 #####
@@ -83,7 +70,30 @@ az webapp list-runtimes --os linux --output table
 
 ```
 
-### 参考資料
+## IaC
+
+- 該当ファイル: ias.json
+
+```sh
+# テンプレートをもとにリソースをデプロイ
+az deployment group create --resource-group $RESOURCE_GROUP --template-file template.json --parameters @parameters.json
+
+# VM で SSH を有効にする
+az vm extension set --resource-group $RESOURCE_GROUP --vm-name $VIRTUAL_MACHINE --name WindowsOpenSSH --publisher Microsoft.Azure.OpenSSH --version 3.0
+
+# VM に接続
+az ssh vm --local-user $VIRTUAL_MACHINE_USER --resource-group $RESOURCE_GROUP --name $VIRTUAL_MACHINE
+
+# TCP 22 port を開く
+az network nsg rule create -g $RESOURCE_GROUP --nsg-name $NETWORK_SECURITY_GROUP -n allow-SSH --priority 1000 --source-address-prefixes 208.130.28.4/32 --destination-port-ranges 22 --protocol TCP
+```
+
+- template.json の書き方参照元
+  - Microsoft Azure 実践ガイド (書籍)
+  - [[公式] Resource Manager テンプレートから Windows 仮想マシンを作成する](https://learn.microsoft.com/ja-jp/azure/virtual-machines/windows/ps-template)<br>
+    JSON 形式でリソース構築用テンプレートを書く方法を記載
+
+## 参考資料
 
 - [[公式] App Service の概要](https://learn.microsoft.com/ja-jp/azure/app-service/overview)
 - [[公式] クイック スタート: Python (Django、Flask、または FastAPI) Web アプリを Azure App Service にデプロイする](https://learn.microsoft.com/ja-jp/azure/app-service/quickstart-python?tabs=flask%2Cwindows%2Cazure-cli%2Cazure-cli-deploy%2Cdeploy-instructions-azportal%2Cterminal-bash%2Cdeploy-instructions-zip-azcli)
@@ -106,3 +116,5 @@ az webapp list-runtimes --os linux --output table
   Virtual machines: vm<br>
   AppServicePlan: asp<br>
   etc...
+- [[公式] Secure Shell (SSH) を使用して接続し、Windows が動作している Azure 仮想マシンにサインオンする方法](https://learn.microsoft.com/ja-jp/azure/virtual-machines/windows/connect-ssh?tabs=azurecli)<br>
+  Windows の VM にリモートから SSH 接続するまでの方法を記載
